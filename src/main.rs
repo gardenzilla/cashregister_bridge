@@ -57,9 +57,9 @@ impl CashierCommand {
         Command::new("echo")
             .arg(format!(
                 "\"fiscat/AEE|SLD|||{}|||\"\"|1|Tételek|8|{}|||{}\"",
-                self.payment_kind.to_code_str(),
                 footnote,
-                self.total_price
+                self.total_price,
+                self.payment_kind.to_code_str(),
             ))
             .arg(">")
             .arg("/dev/ttyUSB0")
