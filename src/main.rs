@@ -63,8 +63,6 @@ impl CashierCommand {
             ))
             .arg(">")
             .arg("/dev/ttyUSB0")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
             .spawn()
             .unwrap()
     }
