@@ -10,5 +10,5 @@ release:
 	rm -rf bin
 	mkdir bin
 	cargo build --release
-	cp target/release/printer_bridge bin/
-	strip bin/printer_bridge
+	cp target/release/cashregister_bridge bin/
+	strip bin/cashregister_bridge
