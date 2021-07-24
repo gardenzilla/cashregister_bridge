@@ -56,7 +56,7 @@ impl CashierCommand {
             .for_each(|n| footnote.push_str(&format!("|{}", n)));
         Command::new("echo")
             .arg(format!(
-                "fiscat/AEE|SLD|||{}|||\"\"|1|Tételek|8|{}|||{}",
+                "\"fiscat/AEE|SLD|||{}|||\"\"|1|Tételek|8|{}|||{}\"",
                 self.payment_kind.to_code_str(),
                 footnote,
                 self.total_price
