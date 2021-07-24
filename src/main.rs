@@ -104,10 +104,12 @@ fn main() {
                     OwnedMessage::Text(jsonstring) => {
                         match serde_json::from_str::<CashierCommand>(&jsonstring) {
                             Ok(command) => {
-                                command
+                                let output = command
                                     .to_child_process()
-                                    .wait()
+                                    .wait_with_output()
                                     .expect("Error waiting for child process");
+                                let res = String::from_utf8_lossy(&output.stdout);
+                                println!("Res is {}", res);
                             }
                             Err(err) => println!("Error! {}", err),
                         }
