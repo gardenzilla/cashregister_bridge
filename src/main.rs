@@ -44,6 +44,9 @@ fn default_footnote() -> Vec<String> {
 }
 
 impl CashierCommand {
+    // IMPORTANT!
+    // Currently only works with FisCat cash register
+    // with software version 0005, via serial communication
     fn to_child_process(self) -> Child {
         let footnote_vec = self.footnote;
         // Create footnote command parts
