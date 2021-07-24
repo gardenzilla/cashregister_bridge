@@ -1,0 +1,15 @@
+[package]
+authors = ["Peter <mezeipetister@gmail.com>"]
+edition = "2018"
+name = "printer_bridge"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+base64 = "*"
+hyper = "*"
+serde = {version = "1.0", features = ["derive"]}
+serde_json = "1.0"
+uuid = {version = "0.8", features = ["serde", "v4"]}
+websocket = "*"
