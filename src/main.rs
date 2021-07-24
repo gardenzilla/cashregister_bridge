@@ -2,6 +2,8 @@ extern crate base64;
 extern crate websocket;
 
 use serde::Deserialize;
+use std::fs::{File, OpenOptions};
+use std::io::Write;
 use std::process::{Child, Command, Stdio};
 use std::{thread, vec};
 use websocket::sync::Server;
@@ -47,24 +49,25 @@ impl CashierCommand {
     // IMPORTANT!
     // Currently only works with FisCat cash register
     // with software version 0005, via serial communication
-    fn to_child_process(self) -> Child {
+    fn to_child_process(self) {
         let footnote_vec = self.footnote;
         // Create footnote command parts
         let mut footnote = format!("{}", footnote_vec.len());
         footnote_vec
             .iter()
             .for_each(|n| footnote.push_str(&format!("|{}", n)));
-        Command::new("echo")
-            .arg(format!(
-                "\"fiscat/AEE|SLD|||{}|||\"\"|1|Tételek|8|{}|||{}\"",
-                footnote,
-                self.total_price,
-                self.payment_kind.to_code_str(),
-            ))
-            .arg(">")
-            .arg("/dev/ttyUSB0")
-            .spawn()
-            .unwrap()
+
+        let command_string = format!(
+            "fiscat/AEE|SLD|||{}|||\"\"|1|Tételek|8|{}|||{}",
+            footnote,
+            self.total_price,
+            self.payment_kind.to_code_str(),
+        );
+
+        
+        let mut device_file = OpenOptions::new().read(true).write(true).open("/dev/ttyUSB0").expect("Could not open cash register device");
+
+        device_file.write_all(command_string.as_bytes()).expect("Error while writing to USB device");
     }
 }
 
@@ -102,12 +105,8 @@ fn main() {
                     OwnedMessage::Text(jsonstring) => {
                         match serde_json::from_str::<CashierCommand>(&jsonstring) {
                             Ok(command) => {
-                                let output = command
-                                    .to_child_process()
-                                    .wait_with_output()
-                                    .expect("Error waiting for child process");
-                                let res = String::from_utf8_lossy(&output.stdout);
-                                println!("Res is {}", res);
+                                command
+                                    .to_child_process();
                             }
                             Err(err) => println!("Error! {}", err),
                         }
