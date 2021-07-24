@@ -1,12 +1,71 @@
 extern crate base64;
 extern crate websocket;
 
-use std::process::{Command, Stdio};
-use std::thread;
-use std::{fs::File, io::prelude::*};
-use uuid::Uuid;
+use serde::Deserialize;
+use std::process::{Child, Command, Stdio};
+use std::{thread, vec};
 use websocket::sync::Server;
 use websocket::OwnedMessage;
+
+// Example command
+// echo "fiscat/AEE|SLD|||5|Gardenzilla|Köszönjük, hogy nálunk vásárolt|"*"|www.gardenzilla.hu|Csók a családnak|||""|1|termék|8|5|||P|500"
+//   > /dev/ttyUSB0
+#[derive(Deserialize)]
+struct CashierCommand {
+    #[serde(default = "default_footnote")]
+    footnote: Option<Vec<String>>,
+    total_price: i32,
+    payment_kind: PaymentKind,
+}
+
+#[derive(Deserialize)]
+enum PaymentKind {
+    Cash,
+    Card,
+}
+
+impl PaymentKind {
+    fn to_code_str(&self) -> &'static str {
+        match self {
+            PaymentKind::Cash => "P",
+            PaymentKind::Card => "N",
+        }
+    }
+}
+
+fn default_footnote() -> Option<Vec<String>> {
+    let v = vec![
+        "Köszönjük, hogy nálunk vásárolt!".to_string(),
+        "*".to_string(),
+        "www.gardenzilla.hu".to_string(),
+        "Eszelős favágó".to_string(),
+    ];
+    Some(v)
+}
+
+impl CashierCommand {
+    fn to_child_process(self) -> Child {
+        let footnote_vec = self.footnote.unwrap();
+        // Create footnote command parts
+        let mut footnote = format!("{}", footnote_vec.len());
+        footnote_vec
+            .iter()
+            .for_each(|n| footnote.push_str(&format!("|{}", n)));
+        Command::new("echo")
+            .arg(format!(
+                "fiscat/AEE|SLD|||{}|||\"\"|1|Tételek|8|{}|||{}",
+                self.payment_kind.to_code_str(),
+                footnote,
+                self.total_price
+            ))
+            .arg(">")
+            .arg("/dev/ttyUSB0")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap()
+    }
+}
 
 fn main() {
     // Bind websocket server
@@ -39,41 +98,13 @@ fn main() {
                         let message = OwnedMessage::Pong(ping);
                         sender.send_message(&message).unwrap();
                     }
-                    OwnedMessage::Text(b64string) => {
-                        let _str: &str = &b64string[1..b64string.len() - 1];
-                        let _str = _str.replace("\n", "");
-                        let _str = _str.replace("\r", "");
-                        let _str = _str.replace("\r\n", "");
-                        let _str = _str.replace("\\n", "");
-                        match base64::decode(&_str) {
-                            Ok(bytes) => {
-                                let file_name = format!("{}.pdf", Uuid::new_v4().to_u128_le());
-
-                                // Create
-                                let mut file = File::create(&file_name)
-                                    .expect("Error while creating temp document file");
-
-                                // Write main latex content into file
-                                file.write_all(&bytes).expect("Error writing bytes to file");
-
-                                // Flush main file
-                                file.flush().expect("Error while flushing file");
-
-                                let mut process = Command::new("lp")
-                                    .arg(&file_name)
-                                    .arg("-d")
-                                    .arg("epson")
-                                    .arg("-o")
-                                    .arg("media=Custom.80x2000mm")
-                                    .stdin(Stdio::piped())
-                                    .stdout(Stdio::piped())
-                                    .spawn()
-                                    .unwrap();
-
-                                process.wait().expect("Error waiting for child process");
-
-                                std::fs::remove_file(&file_name)
-                                    .expect("Error while removing temp doc file");
+                    OwnedMessage::Text(jsonstring) => {
+                        match serde_json::from_str::<CashierCommand>(&jsonstring) {
+                            Ok(command) => {
+                                command
+                                    .to_child_process()
+                                    .wait()
+                                    .expect("Error waiting for child process");
                             }
                             Err(err) => println!("Error! {}", err),
                         }
@@ -82,5 +113,30 @@ fn main() {
                 }
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::CashierCommand;
+
+    #[test]
+    fn test_deserialize() {
+        assert!(serde_json::from_str::<CashierCommand>(
+            r#"{"total_price": 12, "payment_kind":"Cash"}"#
+        )
+        .is_ok());
+        assert!(serde_json::from_str::<CashierCommand>(
+            r#"{"total_price": 12, "payment_kind":"Card"}"#
+        )
+        .is_ok());
+        assert!(serde_json::from_str::<CashierCommand>(
+            r#"{"total_price": 12, "payment_kind":"Cashh"}"#
+        )
+        .is_err());
+        let command =
+            serde_json::from_str::<CashierCommand>(r#"{"total_price": 12, "payment_kind":"Cash"}"#)
+                .unwrap();
+        assert_eq!(command.footnote.unwrap().len() > 0, true);
     }
 }
