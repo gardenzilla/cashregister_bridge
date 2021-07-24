@@ -13,7 +13,7 @@ use websocket::OwnedMessage;
 #[derive(Deserialize)]
 struct CashierCommand {
     #[serde(default = "default_footnote")]
-    footnote: Option<Vec<String>>,
+    footnote: Vec<String>,
     total_price: i32,
     payment_kind: PaymentKind,
 }
@@ -33,19 +33,19 @@ impl PaymentKind {
     }
 }
 
-fn default_footnote() -> Option<Vec<String>> {
+fn default_footnote() -> Vec<String> {
     let v = vec![
         "Köszönjük, hogy nálunk vásárolt!".to_string(),
         "*".to_string(),
         "www.gardenzilla.hu".to_string(),
         "Eszelős favágó".to_string(),
     ];
-    Some(v)
+    v
 }
 
 impl CashierCommand {
     fn to_child_process(self) -> Child {
-        let footnote_vec = self.footnote.unwrap();
+        let footnote_vec = self.footnote;
         // Create footnote command parts
         let mut footnote = format!("{}", footnote_vec.len());
         footnote_vec
@@ -137,6 +137,6 @@ mod tests {
         let command =
             serde_json::from_str::<CashierCommand>(r#"{"total_price": 12, "payment_kind":"Cash"}"#)
                 .unwrap();
-        assert_eq!(command.footnote.unwrap().len() > 0, true);
+        assert_eq!(command.footnote.len() > 0, true);
     }
 }
